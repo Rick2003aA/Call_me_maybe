@@ -1,0 +1,25 @@
+[project]
+name = "call_me_maybe"
+version = "0.1.0"
+description = "Function calling practice"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0.0",
+    "numpy>=1.26.0",
+    "llm-sdk"
+]
+
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "flake8>=7.0.0",
+    "mypy>=1.8.0",
+]
+
+[tool.uv.sources]
+llm-sdk = { path = "llm_sdk" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
