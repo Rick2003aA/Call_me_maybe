@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0.0",
     "numpy>=1.26.0",
+    "protobuf>=5.0.0",
     "llm-sdk"
 ]
 

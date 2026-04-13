@@ -1,4 +1,8 @@
-from llm_sdk import Small_LLM_Model
+# 道具箱
+try:
+    from llm_sdk import Small_LLM_Model
+except ImportError:  # Fallback for the local source tree layout.
+    from llm_sdk.llm_sdk import Small_LLM_Model
 
 
 def build_model(model_name: str = "Qwen/Qwen3-0.6B") -> Small_LLM_Model:
@@ -21,22 +25,28 @@ def get_next_token_logits(
     return model.get_logits_from_input_ids(input_ids)
 
 
-if __name__ == "__main__":
-    sample_text = "What is the sum of 2 and 3?"
+def build_token_texts(
+        model: Small_LLM_Model,
+        logits: list[float]
+        ) -> dict[int, str]:
+    token_texts = {}
 
-    try:
-        model = build_model()
-        input_ids = encode_text(model, sample_text)
-        decoded_text = decode_tokens(model, input_ids)
+    for token_id, _ in enumerate(logits):
+        token_texts[token_id] = decode_tokens(model, [token_id])
+
+    return token_texts
+
+
+def generate_traditional_response(
+        model: Small_LLM_Model,
+        input_ids: list[int],
+) -> str:
+    max_new_tokens = 40
+    generated_ids: list[int] = []
+    for _ in range(max_new_tokens):
         logits = get_next_token_logits(model, input_ids)
-    except Exception as error:
-        print(f"Experiment failed: {error}")
-    else:
-        print("sample_text:", sample_text)
-        print("input_ids:", input_ids)
-        print("input_ids type:", type(input_ids))
-        print("decoded_text:", decoded_text)
-        print("decoded_text type:", type(decoded_text))
-        print("logits type:", type(logits))
-        print("logits length:", len(logits))
-        print("first 5 logits:", logits[:5])
+        token_id = max(range(len(logits)), key=lambda i: logits[i])
+        generated_ids.append(token_id)
+        input_ids.append(token_id)
+
+    return decode_tokens(model, generated_ids)
