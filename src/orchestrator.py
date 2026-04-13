@@ -1,8 +1,8 @@
-from .decoder import decode_function_name
+from .decoder import decode_function_name, decode_string_parameter, decode_number_parameter
 from .json_loader import load_function_definitions, load_prompt_items
 from .llm_adapter import build_model, encode_text
 from .models import AppConfig, FunctionDefinition
-from .prompt_builder import build_function_name_prompt, build_number_parameter_prompt
+from .prompt_builder import build_function_name_prompt, build_number_parameter_prompt, build_string_parameter_prompt
 from .errors import AppError
 
 
@@ -10,20 +10,6 @@ try:
     from llm_sdk import Small_LLM_Model
 except ImportError:  # Fallback for the local source tree layout.
     from llm_sdk.llm_sdk import Small_LLM_Model
-
-
-def decode_add_numbers_parameters(
-        model: Small_LLM_Model,
-        user_prompt: str
-) -> dict[str, int]:
-    a_prompt = build_number_parameter_prompt(user_prompt, "a")
-    a_input_ids = encode_text(model, a_prompt)
-    a_value = ...
-
-    b_prompt = build_number_parameter_prompt(user_prompt, "b")
-    b_input_ids = encode_text(model, b_prompt)
-    b_value = ...
-    return {"a": a_value, "b": b_value}
 
 
 def find_function_by_name(
@@ -41,10 +27,23 @@ def decode_parameters_for_function(
         user_prompt: str,
         function_def: FunctionDefinition
         ) -> dict[str, object]:
-    if function_def.name == "fn_add_numbers":
-        parameters = decode_add_numbers_parameters(model, user_prompt)
-    else:
-        parameters = {}
+    parameters = {}
+    for param_name, param_def in function_def.parameters.items():
+        if param_def.type == "number":
+            prompt_text = build_number_parameter_prompt(user_prompt,
+                                                        param_name)
+            input_ids = encode_text(model, prompt_text)
+            value = decode_number_parameter(model, input_ids)
+        elif param_def.type == "string":
+            prompt_text = build_string_parameter_prompt(user_prompt,
+                                                        param_name)
+            input_ids = encode_text(model, prompt_text)
+            value = decode_string_parameter(model, input_ids)
+        else:
+            raise AppError(f"Unsupported parameter type: {param_def.type}")
+
+        parameters[param_name] = value
+
     return parameters
 
 

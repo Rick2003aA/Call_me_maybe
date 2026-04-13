@@ -1,5 +1,8 @@
 from .models import FunctionDefinition
 
+def build_string_parameter_prompt(user_prompt: str, target: str) -> str:
+    pass
+
 
 def build_number_parameter_prompt(user_prompt: str, target: str) -> str:
     lines = [

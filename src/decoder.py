@@ -99,3 +99,14 @@ def decode_function_name(
         token_id = choose_token(generated_ids, candidate_sequences, logits)
         generated_ids.append(token_id)
         input_ids.append(token_id)
+
+
+# ==== パラメーター抽出のための機能 ====
+
+
+def decode_number_parameter(model: Small_LLM_Model, param_name: str) -> int:
+    pass
+
+
+def decode_string_parameter(model: Small_LLM_Model, param_name: str) -> str:
+    pass
