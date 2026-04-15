@@ -1,20 +1,45 @@
 from .models import FunctionDefinition
 
-def build_string_parameter_prompt(user_prompt: str, target: str) -> str:
-    pass
 
-
-def build_number_parameter_prompt(user_prompt: str, target: str) -> str:
+def build_string_parameter_prompt(
+        user_prompt: str,
+        function_name: str,
+        target: str
+        ) -> str:
+    if target == "a":
+        target_signal = "first"
+    else:
+        target_signal = "second"
     lines = [
-        "Extract the value for one parameter.",
-        "Function: fn_add_numbers",
-        f"Target parameter: {target}",
-        "Parameter type: number",
-        "Return only the number.",
+        f"Extract the {target_signal} parameter from the following User request",
         f"User request: {user_prompt}",
-        "Value:",
+        f"Function: {function_name}",
+        f"Target parameter: {target_signal}",
+        "Parameter type: string",
+        "Return only the number followed by <END>."
+        "Value:"
     ]
-    lines.append(user_prompt)
+    return "\n".join(lines)
+
+
+def build_number_parameter_prompt(
+    user_prompt: str,
+    function_name: str,
+    target: str
+) -> str:
+    if target == "a":
+        instruction = "Extract the first number."
+    elif target == "b":
+        instruction = "Extract the second number."
+    else:
+        instruction = f"Return parameter {target}."
+
+    lines = [
+        f"Request: {user_prompt}",
+        f"Function: {function_name}",
+        instruction,
+        "Return only the number followed by <END>.",
+    ]
     return "\n".join(lines)
 
 

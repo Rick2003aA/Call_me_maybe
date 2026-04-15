@@ -104,9 +104,38 @@ def decode_function_name(
 # ==== パラメーター抽出のための機能 ====
 
 
-def decode_number_parameter(model: Small_LLM_Model, param_name: str) -> int:
-    pass
+def choose_number_token(model: Small_LLM_Model, logits: list[float]) -> int:
+    allowed_token_ids: list[int] = []
+
+    for token_id in range(len(logits)):
+        s = model.decode([token_id])
+        if s.isdigit():
+            allowed_token_ids.append(token_id)
+
+    if not allowed_token_ids:
+        raise DecodeError("No valid token for number decoding")
+
+    return max(allowed_token_ids, key=lambda token_id: logits[token_id])
 
 
-def decode_string_parameter(model: Small_LLM_Model, param_name: str) -> str:
-    pass
+def decode_number_parameter(
+    model: Small_LLM_Model,
+    input_ids: list[int]
+) -> int:
+    generated_ids: list[int] = []
+
+    for _ in range(3):
+        logits = get_next_token_logits(model, input_ids)
+        token_id = choose_number_token(model, logits)
+        generated_ids.append(token_id)
+        input_ids.append(token_id)
+
+    text = model.decode(generated_ids)
+    return int(text)
+
+
+def decode_string_parameter(
+        model: Small_LLM_Model,
+        input_ids: list[int]
+        ) -> str:
+    return "FFFF"

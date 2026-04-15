@@ -31,11 +31,13 @@ def decode_parameters_for_function(
     for param_name, param_def in function_def.parameters.items():
         if param_def.type == "number":
             prompt_text = build_number_parameter_prompt(user_prompt,
+                                                        function_def.name,
                                                         param_name)
             input_ids = encode_text(model, prompt_text)
             value = decode_number_parameter(model, input_ids)
         elif param_def.type == "string":
             prompt_text = build_string_parameter_prompt(user_prompt,
+                                                        function_def.name,
                                                         param_name)
             input_ids = encode_text(model, prompt_text)
             value = decode_string_parameter(model, input_ids)
