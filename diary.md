@@ -464,3 +464,72 @@ call_me_maybe/
 12. [ ] 提出前確認を全部埋める
 
 memo
+
+## 2026-04-15
+
+### 今日確認できたこと
+- `name` の constrained decoding は引き続きかなり安定している
+- `parameters` については、`orchestrator.py` で
+  - 選ばれた関数定義を引く
+  - `function_def.parameters` を順番に見る
+  - 型ごとの decoder を呼ぶ
+  という流れまではつながった
+- `fn_add_numbers` では
+  - `a` はかなり取れる
+  - `b` は最初の数字に引っ張られやすい
+  という傾向が見えた
+- `fn_greet`, `fn_reverse_string`, `fn_get_square_root` は一部ケースでかなり良い値が取れた
+- 一方で `fn_substitute_string_with_regex` のような複数 string 引数関数はまだ大きく崩れる
+
+### `parameters` 実験で見えたこと
+- prompt だけで `a` と `b` を完全に分離するのは難しい
+- `<END>` を使った number decoder は、終了記号の途中 token をどう許すかが難しく、実装が不安定になりやすい
+- 固定長の token 生成で止める方法は簡単だが、短い数と長い数の両立が難しい
+- そのため、number 抽出は一時的に
+  - 短い prompt
+  - 短い自由生成
+  - Python 側で最初の整数を読む
+  という最小実装で試す方が前進しやすいとわかった
+
+### rules.md を読み直して変わった理解
+- これまでは
+  - `name` を LLM に決めさせる
+  - `parameters` を LLM に決めさせる
+  - 最終 JSON は Python 側で安全に組み立てる
+  という設計を考えていた
+- しかし `rules.md` を読み直すと、mandatory part では
+  - 100% valid JSON output
+  - constrained decoding
+  - schema-compliant
+  が強く求められている
+- そのため、課題文に厳密に寄せるなら
+  - Python が自由に最終 JSON を組む
+  のではなく
+  - JSON 全体の構造自体を constrained decoding で管理する
+  方向に寄せる必要があると理解した
+
+### 今後の設計方針
+- 今まで作った部品のうち、次は以下を再利用できる
+  - `decode_function_name()`
+  - 選ばれた関数から schema を引く流れ
+  - parameter 型ごとの decoder の発想
+- 一方で、主役ではなくなるのは
+  - Python 側で `{"prompt": ..., "name": ..., "parameters": ...}` を直接組み立てる部分
+- 次に本当に必要なのは
+  - JSON 全体の生成状態を管理する層
+  - その中で `"name"` の値の位置では `decode_function_name()`
+  - `"parameters"` の値の位置では型別 decoder
+  を呼ぶ仕組み
+
+### 現在地の整理
+- `name` の constrained decodingは strong prompt と合わせてかなり通る
+- `parameters` は
+  - schema を見る流れ
+  - 型ごとの prompt を作る流れ
+  まではできている
+- ただし現状の `parameters` 実装は
+  - 精度面でまだ弱い
+  - さらに課題の最終要求である「JSON 全体 constrained decoding」とは少しズレがある
+- したがって、次の大きなタスクは
+  - `parameters` 個別抽出の精度を最低限確保しつつ
+  - JSON 全体 constrained decoding の設計に進むこと

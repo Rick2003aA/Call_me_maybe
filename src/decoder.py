@@ -1,10 +1,12 @@
+import re
+
 try:
     from llm_sdk import Small_LLM_Model
 except ImportError:  # Fallback for the local source tree layout.
     from llm_sdk.llm_sdk import Small_LLM_Model
 
 from .errors import DecodeError
-from .llm_adapter import encode_text, get_next_token_logits
+from .llm_adapter import decode_tokens, encode_text, get_next_token_logits
 
 # LLM に「次どうしたい？」と聞く
 # LLM が返した候補表を見る
@@ -104,38 +106,49 @@ def decode_function_name(
 # ==== パラメーター抽出のための機能 ====
 
 
-def choose_number_token(model: Small_LLM_Model, logits: list[float]) -> int:
-    allowed_token_ids: list[int] = []
+def generate_greedy_text(
+    model: Small_LLM_Model,
+    input_ids: list[int],
+    max_new_tokens: int = 8,
+) -> str:
+    # パラメーター抽出では、まず短く自由生成してから Python 側で値を読む。
+    generated_ids: list[int] = []
+    working_input_ids = input_ids.copy()
 
-    for token_id in range(len(logits)):
-        s = model.decode([token_id])
-        if s.isdigit():
-            allowed_token_ids.append(token_id)
+    for _ in range(max_new_tokens):
+        logits = get_next_token_logits(model, working_input_ids)
+        token_id = max(range(len(logits)), key=lambda i: logits[i])
+        generated_ids.append(token_id)
+        working_input_ids.append(token_id)
 
-    if not allowed_token_ids:
-        raise DecodeError("No valid token for number decoding")
+        text = decode_tokens(model, generated_ids)
+        if "\n" in text:
+            break
 
-    return max(allowed_token_ids, key=lambda token_id: logits[token_id])
+    return decode_tokens(model, generated_ids)
 
 
 def decode_number_parameter(
     model: Small_LLM_Model,
     input_ids: list[int]
 ) -> int:
-    generated_ids: list[int] = []
+    text = generate_greedy_text(model, input_ids)
+    match = re.search(r"-?\d+", text)
 
-    for _ in range(3):
-        logits = get_next_token_logits(model, input_ids)
-        token_id = choose_number_token(model, logits)
-        generated_ids.append(token_id)
-        input_ids.append(token_id)
+    if match is None:
+        raise DecodeError(f"Failed to decode number parameter: {text}")
 
-    text = model.decode(generated_ids)
-    return int(text)
+    return int(match.group())
 
 
 def decode_string_parameter(
         model: Small_LLM_Model,
         input_ids: list[int]
         ) -> str:
-    return "FFFF"
+    text = generate_greedy_text(model, input_ids, max_new_tokens=16).strip()
+
+    if not text:
+        raise DecodeError("Failed to decode string parameter.")
+
+    # 文字列の前後に quote があれば落として扱いやすくする。
+    return text.strip("\"'")

@@ -6,18 +6,11 @@ def build_string_parameter_prompt(
         function_name: str,
         target: str
         ) -> str:
-    if target == "a":
-        target_signal = "first"
-    else:
-        target_signal = "second"
     lines = [
-        f"Extract the {target_signal} parameter from the following User request",
-        f"User request: {user_prompt}",
+        f"Request: {user_prompt}",
         f"Function: {function_name}",
-        f"Target parameter: {target_signal}",
-        "Parameter type: string",
-        "Return only the number followed by <END>."
-        "Value:"
+        f"Return only the value of parameter {target}.",
+        "Value:",
     ]
     return "\n".join(lines)
 
@@ -38,7 +31,8 @@ def build_number_parameter_prompt(
         f"Request: {user_prompt}",
         f"Function: {function_name}",
         instruction,
-        "Return only the number followed by <END>.",
+        "Return only the number.",
+        "Value:",
     ]
     return "\n".join(lines)
 
