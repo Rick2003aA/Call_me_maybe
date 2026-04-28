@@ -1,56 +1,64 @@
 from .models import FunctionDefinition
 
 
-def build_string_parameter_prompt(
-        user_prompt: str,
-        function_name: str,
-        target: str
-        ) -> str:
-    lines = [
-        f"Request: {user_prompt}",
-        f"Function: {function_name}",
-        f"Return only the value of parameter {target}.",
-        "Value:",
-    ]
-    return "\n".join(lines)
-
-
-def build_number_parameter_prompt(
-    user_prompt: str,
-    function_name: str,
-    target: str
-) -> str:
-    if target == "a":
-        instruction = "Extract the first number."
-    elif target == "b":
-        instruction = "Extract the second number."
-    else:
-        instruction = f"Return parameter {target}."
-
-    lines = [
-        f"Request: {user_prompt}",
-        f"Function: {function_name}",
-        instruction,
-        "Return only the number.",
-        "Value:",
-    ]
-    return "\n".join(lines)
-
-
-def build_function_name_prompt(
+def build_json_generation_context(
     functions: list[FunctionDefinition],
     user_prompt: str,
 ) -> str:
-    lines = [
-        "Choose the best function name for the user request.",
-        "Return only the function name.",
-        "Available functions:",
-    ]
+    """Build the prompt used for full JSON generation."""
+    function_lines = []
 
     for function in functions:
-        lines.append(f"- {function.name}: {function.description}")
+        parameter_lines = []
+        for parameter_name, parameter_definition in (
+            function.parameters.items()
+        ):
+            parameter_lines.append(
+                f"{parameter_name}: {parameter_definition.type}"
+            )
 
-    lines.append(f"User request: {user_prompt}")
-    lines.append("Function name:")
+        function_lines.append(
+            (
+                f"- name: {function.name}\n"
+                f"  description: {function.description}\n"
+                f"  parameters: {', '.join(parameter_lines)}"
+            )
+        )
 
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            "You are generating one JSON object for function calling.",
+            "The JSON object must contain exactly these keys:",
+            '1. "prompt"',
+            '2. "name"',
+            '3. "parameters"',
+            "Choose the best function for the user request.",
+            "Do not answer the request.",
+            "Do not compute the function result.",
+            "Generate only argument values needed to call the function.",
+            "For string arguments, copy literal text from the user request",
+            "when the argument asks for existing text.",
+            "For replacement strings, output only the replacement text",
+            "itself.",
+            "For regex strings, output the smallest pattern that matches one",
+            "target occurrence. Do not include surrounding text and do not",
+            "add .* just because the target appears multiple times.",
+            "For common regex requests, use normal regex notation: digits or",
+            "numbers use [0-9]+, vowels use [aeiouAEIOU], whitespace uses",
+            "\\s+.",
+            "Never output a plain character list as regex. For vowels, output",
+            "[aeiouAEIOU], not aeiouAEIOU.",
+            "For numbers, output [0-9]+, not ([0-9]+)|([0-9]+).",
+            "Examples for regex replacement arguments:",
+            "Replace all numbers in \"a 12 b\" with X -> regex [0-9]+,",
+            "replacement X.",
+            "Replace vowels in \"hello\" with asterisks -> regex",
+            "[aeiouAEIOU], replacement *.",
+            "Substitute the word 'cat' with 'dog' -> regex cat,",
+            "replacement dog.",
+            "Available functions:",
+            *function_lines,
+            f"User request: {user_prompt}",
+            "JSON object:",
+        ]
+    )
