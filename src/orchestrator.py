@@ -30,5 +30,6 @@ def run_pipeline(config: AppConfig) -> None:
         except json.JSONDecodeError as error:
             message = f"Failed to parse generated JSON: {json_text}"
             raise AppError(message) from error
+        print(result_dict)
         results.append(FunctionCallResult(**result_dict))
     write_results(config.output, results)

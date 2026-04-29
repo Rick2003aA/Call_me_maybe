@@ -15,6 +15,7 @@ MAX_REGEX_STRING_TOKENS = 32
 MAX_REPLACEMENT_STRING_TOKENS = 16
 MAX_GENERAL_STRING_TOKENS = 120
 MAX_NUMBER_TOKENS = 12
+DISALLOWED_MINIMAL_REGEX_CHARS = "^$()"
 
 
 def _best_token(logits: list[float], allowed: set[int]) -> int:
@@ -87,68 +88,46 @@ def _safe_string_token(text: str) -> bool:
     return all(character >= " " for character in text)
 
 
-def _balanced_regex(text: str) -> bool:
-    """Return whether brackets and parentheses are balanced enough to stop."""
-    square_depth = 0
-    round_depth = 0
-
-    for character in text:
-        if character == "[":
-            square_depth += 1
-        elif character == "]":
-            square_depth -= 1
-        elif character == "(":
-            round_depth += 1
-        elif character == ")":
-            round_depth -= 1
-        if square_depth < 0 or round_depth < 0:
-            return False
-
-    if square_depth != 0 or round_depth != 0:
-        return False
-    return text[-1] not in {"|", "(", "[", "."}
-
-
-def _plain_literal(text: str) -> bool:
-    """Return whether the regex generated so far is just literal text."""
-    return text.isalnum() or (
-        "_" in text and text.replace("_", "").isalnum()
-    )
-
-
 def _should_close_string(
     value: str,
     next_text: str,
     parameter_name: str,
 ) -> bool:
-    """Close short generated values before the model starts rambling."""
+    """Close short generated values when the model starts extra text."""
     if not value:
         return False
-
-    stripped = value.strip()
-    next_stripped = next_text.strip()
+    if not next_text:
+        return False
 
     if parameter_name == "regex":
-        if not _balanced_regex(stripped):
-            return False
-        if next_text[:1].isspace():
-            return True
-        if next_stripped[:1] in {"|", ",", "["}:
-            return True
-        if next_stripped[:1] == "." and _plain_literal(stripped):
-            return True
-        if next_stripped in {"or", "and", "with", "in"}:
-            return True
-
+        return (
+            next_text[0].isspace()
+            or next_text[0] == "|"
+            or next_text[0] == "."
+        )
     if parameter_name == "replacement":
-        if next_text[:1].isspace():
+        if (
+            len(value) == 1
+            and not value.isalnum()
+            and next_text[0] == value
+        ):
             return True
-        if next_stripped[:1] in {"?", ".", ",", ";", ":", "!"}:
-            return True
-        if stripped in {"*", "_", "-", "+"}:
-            return next_stripped[:1] in {"*", "_", "-", "+", "?"}
-
+        return next_text[0].isspace()
     return False
+
+
+def _normalize_string_value(value: str, parameter_name: str) -> str:
+    """Normalize short string arguments after LLM extraction."""
+    if parameter_name == "regex" and value.startswith(".*"):
+        return value[2:]
+    if (
+        parameter_name == "replacement"
+        and len(value) > 1
+        and len(set(value)) == 1
+        and not value[0].isalnum()
+    ):
+        return value[0]
+    return value
 
 
 def _string_token_limit(parameter_name: str) -> int:
@@ -192,6 +171,11 @@ def _decode_string(
                 continue
             if not value and token_text[0].isspace():
                 continue
+            if parameter_name == "regex" and any(
+                character in token_text
+                for character in DISALLOWED_MINIMAL_REGEX_CHARS
+            ):
+                continue
             allowed.add(token_id)
 
         token_id = _best_token(logits, allowed)
@@ -203,6 +187,7 @@ def _decode_string(
             parameter_name,
         ):
             input_ids.extend(generated)
+            value = _normalize_string_value(value, parameter_name)
             parts.append(value)
             parts.append(_emit(model, input_ids, '"'))
             return "".join(parts)
@@ -213,6 +198,7 @@ def _decode_string(
     # ==== 中身があるなら無理やり " で閉じて返す ====
     if value:
         input_ids.extend(generated)
+        value = _normalize_string_value(value, parameter_name)
         parts.append(value)
         parts.append(_emit(model, input_ids, '"'))
         return "".join(parts)
